@@ -1,0 +1,8 @@
+.DS_Store
+.build/
+Packages/
+DerivedData/
+.swiftpm/
+ml-sharp/
+venv/
+*.swp

@@ -778,6 +778,10 @@ public class SharpService: SharpServiceProtocol {
     public let tempDirectory: URL
     private var cachedGaussians: GaussianSplatData?
     
+    /// Flag to disable buggy stereo reconstruction (spatial image merge) for now.
+    /// When disabled, spatial photos will be processed as single images.
+    private let isStereoReconstructionEnabled = false
+    
     public init() {
         self.tempDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("AgentGlass-Sharp-\(UUID().uuidString)")
@@ -878,8 +882,9 @@ public class SharpService: SharpServiceProtocol {
                 }
             }
             
+            
             // Check for stereo pair (iPhone spatial photos with left/right images)
-            if let (leftImage, rightImage) = extractStereoPair(from: url) {
+            if isStereoReconstructionEnabled, let (leftImage, rightImage) = extractStereoPair(from: url) {
                 print("Sharp: 🎬 Stereo pair detected! Using stereo reconstruction...")
                 print("Sharp: Processing left image...")
                 

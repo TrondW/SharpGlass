@@ -63,6 +63,10 @@ struct InputOverlay: NSViewRepresentable {
         override var canBecomeKeyView: Bool { true }
         
         override func mouseDown(with event: NSEvent) {
+            if shouldIgnoreEvent(event) {
+                isDraggingInView = false
+                return
+            }
             self.window?.makeFirstResponder(self)
             isDraggingInView = true
             onMouseDown?()
@@ -80,6 +84,10 @@ struct InputOverlay: NSViewRepresentable {
         }
         
         override func rightMouseDown(with event: NSEvent) {
+            if shouldIgnoreEvent(event) {
+                isDraggingInView = false
+                return
+            }
             self.window?.makeFirstResponder(self)
             isDraggingInView = true
             onMouseDown?()
@@ -97,6 +105,10 @@ struct InputOverlay: NSViewRepresentable {
         }
         
         override func otherMouseDown(with event: NSEvent) {
+            if shouldIgnoreEvent(event) {
+                isDraggingInView = false
+                return
+            }
             self.window?.makeFirstResponder(self)
             isDraggingInView = true
             onMouseDown?()
@@ -111,6 +123,14 @@ struct InputOverlay: NSViewRepresentable {
         override func otherMouseUp(with event: NSEvent) {
             isDraggingInView = false
             onMouseUp?()
+        }
+        
+        private func shouldIgnoreEvent(_ event: NSEvent) -> Bool {
+            let location = event.locationInWindow
+            guard let window = self.window else { return false }
+            // Ignore events in the top 40 pixels (title bar area)
+            // macOS Y coordinate starts from bottom (0)
+            return location.y > window.frame.height - 40
         }
         
         override func scrollWheel(with event: NSEvent) {

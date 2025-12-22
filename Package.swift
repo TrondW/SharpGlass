@@ -23,8 +23,7 @@ let package = Package(
             path: "Sources/Main",
             exclude: ["Info.plist"],
             resources: [
-                .process("Assets.xcassets"),
-                .copy("Resources/ml-sharp")
+                .process("Assets.xcassets")
             ],
             linkerSettings: [
                 .unsafeFlags([

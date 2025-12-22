@@ -7,3 +7,4 @@ ml-sharp/
 venv/
 *.swp
 dist/
+Sources/Main/Resources/ml-sharp/

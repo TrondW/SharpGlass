@@ -30,8 +30,8 @@ pip install --upgrade pip
 if [ ! -d "ml-sharp" ]; then
     echo "⚠️  ml-sharp directory not found. Cloning from repository..."
     # Replace with actual URL if public, otherwise instructions
-    echo "   Please ensure ml-sharp is available in the root directory."
-    # git clone https://github.com/google-deepmind/ml-sharp.git ml-sharp
+    echo "   Cloning ml-sharp from apple/ml-sharp..."
+    git clone https://github.com/apple/ml-sharp.git ml-sharp
 fi
 
 if [ -d "ml-sharp" ]; then

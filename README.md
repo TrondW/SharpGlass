@@ -9,6 +9,7 @@ SharpGlass is a macOS application for generating and rendering 3D Gaussian Splat
 - **Real-time Rendering**: interactive 3D navigation using a high-performance Metal-based splatting renderer.
 - **Video Export**: Export cinematic parallax animations as MP4 videos.
 - **Optimized Resource Management**: Automatically prunes large datasets and manages memory efficiently for smooth performance.
+- **Smart Onboarding**: Automatically handles backend setup (Python venv, dependencies) for end-users on first launch.
 - **Modern UI**: Full-bleed design with glassmorphic overlays and intuitive drag-and-drop file support.
 
 ## Prerequisites
@@ -41,10 +42,17 @@ SharpGlass is a macOS application for generating and rendering 3D Gaussian Splat
 ## Installation & Setup Details
 
 ### Python Environment
-SharpGlass uses a Python-based backend (`ml-sharp`) for the initial 3D inference. The `setup.sh` script handles:
-- Creating a `venv`
-- Installing `ml-sharp` in editable mode from the local directory.
-- Ensuring all Python dependencies (Torch, etc.) are available.
+SharpGlass uses a Python-based backend (`ml-sharp`) for 3D inference.
+
+- **For Users**: The app features **Smart Onboarding** which automatically installs the backend environment into `~/Library/Application Support/` on the first run. No manual terminal commands required.
+- **For Developers**: The `setup.sh` script prepares your local development environment.
+
+## Building for Distribution
+To create a standalone `.app` bundle:
+```bash
+./build_distribution.sh
+```
+See [DISTRIBUTION.md](DISTRIBUTION.md) for full details on signing, notarization, and architecture.
 
 ### ML Models
 On the first run, the application will download the necessary model weights (approx. 1.2GB) required for 3D generation.

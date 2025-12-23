@@ -22,7 +22,7 @@ SharpGlass is a macOS application for generating and rendering 3D Gaussian Splat
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/trondW/SharpGlass.git
+   git clone https://github.com/TrondW/SharpGlass.git
    cd SharpGlass
    ```
 

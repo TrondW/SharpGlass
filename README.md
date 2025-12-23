@@ -35,7 +35,7 @@ SharpGlass is a macOS application for generating and rendering 3D Gaussian Splat
 
 3. **Run the application**:
    ```bash
-   swift run SharpGlassApp
+   swift run SharpGlass
    ```
 
 ## Installation & Setup Details

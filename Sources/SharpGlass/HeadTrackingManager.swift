@@ -27,9 +27,11 @@ class HeadTrackingManager: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
             self.processFace(face)
         }
         #if !targetEnvironment(simulator)
-        // Force CPU execution to prevent GPU contention with Metal Splatter
-        if let cpuDevice = MLComputeDevice.cpu() {
-            req.setComputeDevice(cpuDevice, for: .main)
+        if #available(macOS 14.0, *) {
+            // TODO: Replace with proper MLComputeDevice logic once stable syntax is confirmed.
+             req.usesCPUOnly = true 
+        } else {
+             req.usesCPUOnly = true
         }
         #endif
         return req

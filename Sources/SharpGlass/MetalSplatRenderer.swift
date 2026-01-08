@@ -589,6 +589,7 @@ class MetalSplatRenderer: NSObject, MTKViewDelegate {
         }
         
         var splats: [SplatData] = []
+        splats.reserveCapacity(gaussians.pointCount)
 
         for i in 0..<gaussians.pointCount {
             splats.append(SplatData(

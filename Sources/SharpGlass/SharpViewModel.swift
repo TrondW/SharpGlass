@@ -490,27 +490,18 @@ public class SharpViewModel: ObservableObject {
                     finalSplat.evictRawPLYData() // Free up raw data memory
                     
                     self.gaussians = finalSplat
+                    self.selectedImage = nil // clear image to indicate splat mode
+                    self.isProcessing = false
+                    self.errorMessage = nil
+                    
+                    self.focusOnSplat(finalSplat)
                     print("Sharp: ✅ Splat loaded and assigned to renderer.")
                 }
                 
             } catch {
                 await MainActor.run {
                     self.errorMessage = "Failed to load splat: \(error.localizedDescription)"
-                }
-            }
-        }
-    }
-                    self.selectedImage = nil // clear image to indicate splat mode
                     self.isProcessing = false
-                    self.errorMessage = nil
-                    
-                    self.focusOnSplat(finalSplat)
-                }
-                    
-
-            } catch {
-                await MainActor.run {
-                    self.errorMessage = "Failed to load splat: \(error.localizedDescription)"
                 }
             }
         }

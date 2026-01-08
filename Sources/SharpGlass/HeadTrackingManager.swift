@@ -4,6 +4,7 @@ import Vision
 import CoreMedia
 import AppKit
 import simd
+import CoreML
 
 /// Manages real-time face tracking using the Vision framework to drive a holographic "off-axis" projection.
 /// Maps physical head position to virtual camera offsets to create a window-like depth effect.
@@ -26,7 +27,10 @@ class HeadTrackingManager: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
             self.processFace(face)
         }
         #if !targetEnvironment(simulator)
-        req.usesCPUOnly = true // CRITICAL: Prevent GPU contention with Metal Splatter
+        // Force CPU execution to prevent GPU contention with Metal Splatter
+        if let cpuDevice = MLComputeDevice.cpu() {
+            req.setComputeDevice(cpuDevice, for: .main)
+        }
         #endif
         return req
     }()

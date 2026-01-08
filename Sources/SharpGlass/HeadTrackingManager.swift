@@ -11,6 +11,11 @@ class HeadTrackingManager: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
     private let captureSession = AVCaptureSession()
     private let videoOutput = AVCaptureVideoDataOutput()
     private let sessionQueue = DispatchQueue(label: "session.queue")
+    private let processingQueue = DispatchQueue(label: "head.tracking.processing", qos: .userInteractive)
+    
+    // Throttling State
+    private var lastFrameTime: TimeInterval = 0
+    private let minFrameInterval: TimeInterval = 0.05 // Cap at ~20 FPS. 60 FPS is overkill for average head movement.
     
     // Callback is thread-safe for the consumer
     var onHeadPositionUpdate: (@MainActor (SIMD3<Float>) -> Void)?
@@ -32,11 +37,17 @@ class HeadTrackingManager: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
                 let input = try AVCaptureDeviceInput(device: device)
                 
                 self.captureSession.beginConfiguration()
+                
+                // OPTIMIZATION: Use lower resolution. Face landmarks don't need 1080p/4K.
+                self.captureSession.sessionPreset = .vga640x480 
+                
                 if self.captureSession.canAddInput(input) {
                     self.captureSession.addInput(input)
                 }
                 
-                self.videoOutput.setSampleBufferDelegate(self, queue: DispatchQueue(label: "head.tracking.queue"))
+                self.videoOutput.setSampleBufferDelegate(self, queue: self.processingQueue)
+                self.videoOutput.alwaysDiscardsLateVideoFrames = true // Drop frames if busy
+                
                 if self.captureSession.canAddOutput(self.videoOutput) {
                     self.captureSession.addOutput(self.videoOutput)
                 }
@@ -58,6 +69,10 @@ class HeadTrackingManager: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
     }
     
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+        // Throttling: Ensure we don't process more than 20 FPS
+        let now = Date().timeIntervalSince1970
+        guard now - lastFrameTime >= minFrameInterval else { return }
+        lastFrameTime = now
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
         
         // Use .up orientation (raw sensor). Mirroring and mapping handled in processFace

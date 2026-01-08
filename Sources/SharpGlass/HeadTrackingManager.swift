@@ -45,9 +45,9 @@ class HeadTrackingManager: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
         #endif
         
         // Add Observers for Stability
-        NotificationCenter.default.addObserver(self, selector: #selector(sessionRuntimeError), name: .AVCaptureSessionRuntimeError, object: captureSession)
-        NotificationCenter.default.addObserver(self, selector: #selector(sessionWasInterrupted), name: .AVCaptureSessionWasInterrupted, object: captureSession)
-        NotificationCenter.default.addObserver(self, selector: #selector(sessionInterruptionEnded), name: .AVCaptureSessionInterruptionEnded, object: captureSession)
+        NotificationCenter.default.addObserver(self, selector: #selector(sessionRuntimeError), name: AVCaptureSession.runtimeErrorNotification, object: captureSession)
+        NotificationCenter.default.addObserver(self, selector: #selector(sessionWasInterrupted), name: AVCaptureSession.wasInterruptedNotification, object: captureSession)
+        NotificationCenter.default.addObserver(self, selector: #selector(sessionInterruptionEnded), name: AVCaptureSession.interruptionEndedNotification, object: captureSession)
         
         sessionQueue.async { [weak self] in
             guard let self = self else { return }
@@ -104,11 +104,9 @@ class HeadTrackingManager: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
         guard let error = notification.userInfo?[AVCaptureSessionErrorKey] as? AVError else { return }
         print("HeadTracking: ⚠️ Session Runtime Error: \(error.localizedDescription)")
         
-        // Auto-restart if media services were reset
-        if error.code == .mediaServicesWereReset {
-            sessionQueue.async { [weak self] in
-                self?.captureSession.startRunning()
-            }
+        // Auto-restart on runtime error
+        sessionQueue.async { [weak self] in
+            self?.captureSession.startRunning()
         }
     }
     

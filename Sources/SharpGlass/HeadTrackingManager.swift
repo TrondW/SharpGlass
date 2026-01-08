@@ -52,15 +52,21 @@ class HeadTrackingManager: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
         sessionQueue.async { [weak self] in
             guard let self = self else { return }
             do {
-                // Priority: Continuity Camera -> Built-in Wide -> Default
+                // Priority: Built-in Wide (Monitor) -> Continuity Camera -> Default
                 var device: AVCaptureDevice?
-                if let continuity = AVCaptureDevice.default(.continuityCamera, for: .video, position: .unspecified) {
-                    device = continuity
-                    print("HeadTracking: 📱 Using Continuity Camera: \(continuity.localizedName)")
-                } else if let builtIn = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front) {
+                
+                // 1. Prefer Built-in Webcam (Correct position for holographic window)
+                if let builtIn = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front) {
                     device = builtIn
                     print("HeadTracking: 💻 Using Built-in Camera: \(builtIn.localizedName)")
-                } else {
+                } 
+                // 2. Fallback to Continuity Camera if no built-in (e.g. Mac Mini / Studio)
+                else if let continuity = AVCaptureDevice.default(.continuityCamera, for: .video, position: .unspecified) {
+                    device = continuity
+                    print("HeadTracking: 📱 Using Continuity Camera: \(continuity.localizedName)")
+                } 
+                // 3. Last Resort
+                else {
                     device = AVCaptureDevice.default(for: .video)
                     print("HeadTracking: 📷 Using Default Camera: \(device?.localizedName ?? "Unknown")")
                 }

@@ -19,12 +19,16 @@ class HeadTrackingManager: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
     
     // Vision Request Reuse
     private lazy var faceRequest: VNDetectFaceLandmarksRequest = {
-        VNDetectFaceLandmarksRequest { [weak self] request, error in
+        let req = VNDetectFaceLandmarksRequest { [weak self] request, error in
             guard let self = self,
                   let results = request.results as? [VNFaceObservation],
                   let face = results.first else { return }
             self.processFace(face)
         }
+        #if !targetEnvironment(simulator)
+        req.usesCPUOnly = true // CRITICAL: Prevent GPU contention with Metal Splatter
+        #endif
+        return req
     }()
     
     // Callback is thread-safe for the consumer

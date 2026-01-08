@@ -486,7 +486,7 @@ public class SharpViewModel: ObservableObject {
                 
                 // Dispatch UI updates back to MainActor
                 await MainActor.run {
-                    var finalSplat = splat
+                    let finalSplat = splat
                     // finalSplat.evictRawPLYData() // KEEP PLY data for saving!
                     
                     self.gaussians = finalSplat
@@ -592,7 +592,7 @@ public class SharpViewModel: ObservableObject {
                     cleanBackground: cleanBackground
                 )
                 
-                var finalSplat = result
+                let finalSplat = result
                 // finalSplat.evictRawPLYData() // KEEP PLY data for saving!
                 
                 self.gaussians = finalSplat

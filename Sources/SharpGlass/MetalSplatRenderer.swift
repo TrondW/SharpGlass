@@ -65,7 +65,7 @@ class MetalSplatRenderer: NSObject, MTKViewDelegate {
     private var shBuffer: MTLBuffer?
     private var emptyBuffer: MTLBuffer?
     private var splatCount: Int = 0
-    private var currentSplatID: UUID?
+    public private(set) var currentSplatID: UUID?
     
     // Safety limit to prevent GPU memory crashes
     private static let MAX_SPLAT_COUNT = 2_000_000

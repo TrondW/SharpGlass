@@ -189,10 +189,12 @@ public struct GaussianSplatData: Identifiable, Sendable {
         print("Sharp: Generating PLY - Points: \(pointCount), SH: \(hasSH), Size: \(totalSize) bytes")
         
         // 3. Fast Allocation & Write
-        return Data(unsafeUninitializedCapacity: totalSize) { buffer, initializedCount in
+        var data = Data(count: totalSize)
+        
+        data.withUnsafeMutableBytes { buffer in
             // Copy header
             let headerBytes = headerData.withUnsafeBytes { $0 }
-            _ = buffer.copyBytes(from: headerBytes)
+            buffer.copyBytes(from: headerBytes)
             var offset = headerData.count
             
             // Write points
@@ -234,8 +236,9 @@ public struct GaussianSplatData: Identifiable, Sendable {
                 
                 offset += stride
             }
-            initializedCount = offset
         }
+        
+        return data
     }
     public init(data: Data) throws {
         self.plyData = data

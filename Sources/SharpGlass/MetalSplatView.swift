@@ -31,7 +31,10 @@ struct MetalSplatView: NSViewRepresentable {
         
         // Update data if present (renderer handles deduplication via ID)
         if let g = gaussians {
-            renderer.load(gaussians: g)
+            // Optimization: Only call load if ID changed to avoid struct-copy/COW overhead every frame
+            if renderer.currentSplatID != g.id {
+                renderer.load(gaussians: g)
+            }
         }
         
         // Update Style

@@ -1,3 +1,10 @@
+import Foundation
+import Vision
+@preconcurrency import AVFoundation
+import CoreMedia
+import AppKit
+import simd
+
 /// Manages real-time face tracking using the Vision framework to drive a holographic "off-axis" projection.
 /// Maps physical head position to virtual camera offsets to create a window-like depth effect.
 class HeadTrackingManager: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {

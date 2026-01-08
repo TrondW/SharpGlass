@@ -24,5 +24,7 @@
 	<string>NSApplication</string>
     <key>NSCameraUseContinuityCameraDeviceType</key>
     <true/>
+    <key>NSCameraUsageDescription</key>
+    <string>SharpGlass uses the camera to track your head position for the holographic effect.</string>
 </dict>
 </plist>

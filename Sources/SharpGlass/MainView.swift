@@ -134,6 +134,22 @@ public struct MainView: View {
                         .foregroundStyle(.white.opacity(0.6))
                         .padding(.top, 12)
                     
+                    // Error Toast
+                    if let error = viewModel.errorMessage {
+                        Text(error)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(Color.red.opacity(0.8))
+                            .cornerRadius(20)
+                            .padding(.top, 8)
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                            .onTapGesture {
+                                viewModel.errorMessage = nil
+                            }
+                    }
+                    
                     Spacer()
                     
                     // Bottom Area (Stats + Pill)

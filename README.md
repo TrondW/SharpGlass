@@ -7,6 +7,7 @@ SharpGlass is a macOS application for generating and rendering 3D Gaussian Splat
 - **3D Generation**: Convert single JPEG/PNG images into 3D Gaussian Splats.
 - **Spatial Photo Support**: Extract depth and stereo pairs from HEIC spatial photos for enhanced reconstruction.
 - **Real-time Rendering**: interactive 3D navigation using a high-performance Metal-based splatting renderer.
+- **Head-Tracked Holography**: Creates a "looking glass" effect using webcam-based face tracking to adjust perspective in real-time.
 - **Optimized Resource Management**: Automatically prunes large datasets and manages memory efficiently for smooth performance.
 - **Smart Onboarding**: Automatically handles backend setup (Python venv, dependencies) for end-users on first launch.
 - **Modern UI**: Full-bleed design with glassmorphic overlays and intuitive drag-and-drop file support.
@@ -65,6 +66,11 @@ On the first run, the application will download the necessary model weights (app
   - **Zoom**: Scroll or Option + Click + Drag
   - **Focus**: Press 'F' to center the view on the splat.
 - **Export**: Use the "Export Video" button to generate a 3D parallax animation.
+- **Holographic Mode**: 
+  - Toggle the "Holographic" switch in the sidebar.
+  - Requires camera access permission.
+  - The view will adjust to your head position to simulate depth behind the screen.
+  - **Manual Zoom**: Use the "Orbit Distance" slider or scroll wheel to bring the hologram closer/further.
 
 ## Contributing
 

@@ -487,7 +487,7 @@ public class SharpViewModel: ObservableObject {
                 // Dispatch UI updates back to MainActor
                 await MainActor.run {
                     var finalSplat = splat
-                    finalSplat.evictRawPLYData() // Free up raw data memory
+                    // finalSplat.evictRawPLYData() // KEEP PLY data for saving!
                     
                     self.gaussians = finalSplat
                     self.selectedImage = nil // clear image to indicate splat mode

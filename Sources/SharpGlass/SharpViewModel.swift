@@ -461,31 +461,45 @@ public class SharpViewModel: ObservableObject {
     }
     
     func loadSplat(url: URL) {
-        // Load .ply directly
-        Task {
+        // Load .ply directly in a DETACHED task to avoid blocking Main Thread
+        Task.detached(priority: .userInitiated) {
             // Handle security scope for regular files dropped onto the app
+            // Note: URL access is thread-safe for file coordination
             let accessing = url.startAccessingSecurityScopedResource()
             defer { if accessing { url.stopAccessingSecurityScopedResource() } }
             
             do {
                 let data = try Data(contentsOf: url)
+                // Parsing happens here (background)
                 var splat = try GaussianSplatData(data: data)
                 
                 // Auto-prune if exceeds GPU memory limits
                 // Lower limit to 1M for MacBook Air stability (was 2M)
                 let maxSplatCount = 1_000_000
                 print("Sharp DEBUG: Checking pruning - Points: \(splat.pointCount), Limit: \(maxSplatCount)")
+                
                 if splat.pointCount > maxSplatCount {
                     print("Sharp: ⚠️ Loaded splat exceeds safe limit (\(splat.pointCount) > \(maxSplatCount))")
+                    // Pruning happens here (background)
                     splat = splat.pruned(maxCount: maxSplatCount)
                 }
                 
-                // Dispatch UI updates
+                // Dispatch UI updates back to MainActor
                 await MainActor.run {
                     var finalSplat = splat
                     finalSplat.evictRawPLYData() // Free up raw data memory
                     
                     self.gaussians = finalSplat
+                    print("Sharp: ✅ Splat loaded and assigned to renderer.")
+                }
+                
+            } catch {
+                await MainActor.run {
+                    self.errorMessage = "Failed to load splat: \(error.localizedDescription)"
+                }
+            }
+        }
+    }
                     self.selectedImage = nil // clear image to indicate splat mode
                     self.isProcessing = false
                     self.errorMessage = nil

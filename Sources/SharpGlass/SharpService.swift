@@ -608,7 +608,8 @@ public struct GaussianSplatData: Identifiable, Sendable {
     
     /// Intelligently prune splats to a maximum count based on quality metrics
     /// Preserves the highest-quality, most visually important splats
-    @MainActor
+    /// Intelligently prune splats to a maximum count based on quality metrics
+    /// Preserves the highest-quality, most visually important splats
     public func pruned(maxCount: Int) -> GaussianSplatData {
         guard pointCount > maxCount else {
             return self // Already under limit

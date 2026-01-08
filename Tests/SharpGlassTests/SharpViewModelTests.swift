@@ -225,9 +225,7 @@ class MockSharpService: SharpServiceProtocol {
         return NSImage()
     }
     
-    func generateParallaxAnimation(from image: NSImage, duration: Double, style: ParallaxStyle) async throws -> [NSImage] {
-        return []
-    }
+    // animateParallax removed from protocol
     
     func setupBackend(progress: @escaping (String, Double) -> Void) async throws {
         if shouldFailSetup {

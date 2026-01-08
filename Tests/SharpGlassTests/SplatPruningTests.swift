@@ -157,7 +157,7 @@ struct SplatPruningTests {
     ) throws -> Data {
         let count = positions.count
         
-        var header = """
+        let header = """
         ply
         format binary_little_endian 1.0
         element vertex \(count)

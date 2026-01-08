@@ -136,9 +136,10 @@ public struct GaussianSplatData: Identifiable, Sendable {
         shs: [Float] = []
     ) throws -> Data {
         let pointCount = positions.count
+        let hasSH = !shs.isEmpty && shs.count == pointCount * 45
         
-        // Use an array of strings to build header safely, avoiding multiline string newline pitfalls
-        let headerLines = [
+        // 1. Build Header
+        var headerLines = [
             "ply",
             "format binary_little_endian 1.0",
             "element vertex \(pointCount)",
@@ -158,56 +159,83 @@ public struct GaussianSplatData: Identifiable, Sendable {
             "property float rot_0",
             "property float rot_1",
             "property float rot_2",
-            "property float rot_3",
-            "end_header"
+            "property float rot_3"
         ]
+        
+        // Add SH Properties if present
+        if hasSH {
+            for i in 0..<45 {
+                headerLines.append("property float f_rest_\(i)")
+            }
+        }
+        
+        headerLines.append("end_header")
         
         let headerString = headerLines.joined(separator: "\n") + "\n"
         
-        guard var data = headerString.data(using: .utf8) else {
+        guard let headerData = headerString.data(using: .utf8) else {
             throw SharpServiceError.processingFailed("Failed to create PLY header")
         }
         
-        // Write binary data for each point
-        for i in 0..<pointCount {
-            // Position
-            data.append(contentsOf: withUnsafeBytes(of: positions[i].x) { Data($0) })
-            data.append(contentsOf: withUnsafeBytes(of: positions[i].y) { Data($0) })
-            data.append(contentsOf: withUnsafeBytes(of: positions[i].z) { Data($0) })
-            
-            // Normal (zeros for now)
-            let zero: Float = 0.0
-            data.append(contentsOf: withUnsafeBytes(of: zero) { Data($0) })
-            data.append(contentsOf: withUnsafeBytes(of: zero) { Data($0) })
-            data.append(contentsOf: withUnsafeBytes(of: zero) { Data($0) })
-            
-            // Color: Convert RGB to SH DC coefficients (f_dc_0, f_dc_1, f_dc_2)
-            // Inverse of: rgb = 0.5 + 0.28209 * f_dc
-            // Therefore: f_dc = (rgb - 0.5) / 0.28209
-            let shC: Float = 0.28209479177387814
-            let dc0 = (colors[i].x - 0.5) / shC
-            let dc1 = (colors[i].y - 0.5) / shC
-            let dc2 = (colors[i].z - 0.5) / shC
-            data.append(contentsOf: withUnsafeBytes(of: dc0) { Data($0) })
-            data.append(contentsOf: withUnsafeBytes(of: dc1) { Data($0) })
-            data.append(contentsOf: withUnsafeBytes(of: dc2) { Data($0) })
-
-            // Opacity (MUST match header order)
-            data.append(contentsOf: withUnsafeBytes(of: opacities[i]) { Data($0) })
-            
-            // Scale
-            data.append(contentsOf: withUnsafeBytes(of: scales[i].x) { Data($0) })
-            data.append(contentsOf: withUnsafeBytes(of: scales[i].y) { Data($0) })
-            data.append(contentsOf: withUnsafeBytes(of: scales[i].z) { Data($0) })
-            
-            // Rotation (quaternion)
-            data.append(contentsOf: withUnsafeBytes(of: rotations[i].x) { Data($0) })
-            data.append(contentsOf: withUnsafeBytes(of: rotations[i].y) { Data($0) })
-            data.append(contentsOf: withUnsafeBytes(of: rotations[i].z) { Data($0) })
-            data.append(contentsOf: withUnsafeBytes(of: rotations[i].w) { Data($0) })
-        }
+        // 2. Calculate Binary Body Size
+        // Standard Props: XYZ(12) + N(12) + RGB(12) + Op(4) + S(12) + R(16) = 68 bytes
+        // SH: 45 * 4 = 180 bytes
+        var stride = 68
+        if hasSH { stride += 180 }
         
-        return data
+        let bodySize = pointCount * stride
+        let totalSize = headerData.count + bodySize
+        
+        print("Sharp: Generating PLY - Points: \(pointCount), SH: \(hasSH), Size: \(totalSize) bytes")
+        
+        // 3. Fast Allocation & Write
+        return Data(unsafeUninitializedCapacity: totalSize) { buffer, initializedCount in
+            // Copy header
+            let headerBytes = headerData.withUnsafeBytes { $0 }
+            _ = buffer.copyBytes(from: headerBytes)
+            var offset = headerData.count
+            
+            // Write points
+            let zero: SIMD3<Float> = SIMD3(0, 0, 0)
+            let shC: Float = 0.28209479177387814
+            
+            for i in 0..<pointCount {
+                // Determine write position (doing pointer math manually nicely)
+                let basePtr = buffer.baseAddress!.advanced(by: offset)
+                
+                // XYZ (12)
+                basePtr.storeBytes(of: positions[i], as: SIMD3<Float>.self)
+                
+                // Normals (12) - Zeros
+                basePtr.advanced(by: 12).storeBytes(of: zero, as: SIMD3<Float>.self)
+                
+                // Colors -> SH DC (12)
+                // f_dc = (rgb - 0.5) / 0.28209
+                let dc = (colors[i] - 0.5) / shC
+                basePtr.advanced(by: 24).storeBytes(of: dc, as: SIMD3<Float>.self)
+                
+                // Opacity (4)
+                basePtr.advanced(by: 36).storeBytes(of: opacities[i], as: Float.self)
+                
+                // Scale (12)
+                basePtr.advanced(by: 40).storeBytes(of: scales[i], as: SIMD3<Float>.self)
+                
+                // Rotation (16)
+                basePtr.advanced(by: 52).storeBytes(of: rotations[i], as: SIMD4<Float>.self)
+                
+                // SH Data (180)
+                if hasSH {
+                    let shStart = i * 45
+                    let shPtr = basePtr.advanced(by: 68).bindMemory(to: Float.self, capacity: 45)
+                    for j in 0..<45 {
+                        shPtr[j] = shs[shStart + j]
+                    }
+                }
+                
+                offset += stride
+            }
+            initializedCount = offset
+        }
     }
     public init(data: Data) throws {
         self.plyData = data

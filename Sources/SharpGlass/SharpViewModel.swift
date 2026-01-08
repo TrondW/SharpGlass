@@ -593,7 +593,7 @@ public class SharpViewModel: ObservableObject {
                 )
                 
                 var finalSplat = result
-                finalSplat.evictRawPLYData() // Free memory from PLY parsing
+                // finalSplat.evictRawPLYData() // KEEP PLY data for saving!
                 
                 self.gaussians = finalSplat
                 self.selectedImage = nil // Free up source image memory

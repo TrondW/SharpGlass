@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import simd
+import UniformTypeIdentifiers
 
 @MainActor
 public class SharpViewModel: ObservableObject {
@@ -419,7 +420,12 @@ public class SharpViewModel: ObservableObject {
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
-        panel.allowedContentTypes = [.image]
+        // AVIF support: explicitly add the type if .image doesn't catch it for some reason
+        if let avif = UTType("public.avif") {
+            panel.allowedContentTypes = [.image, avif]
+        } else {
+            panel.allowedContentTypes = [.image]
+        }
         
         if panel.runModal() == .OK, let url = panel.url {
             loadImage(url: url)
@@ -466,7 +472,8 @@ public class SharpViewModel: ObservableObject {
                 var splat = try GaussianSplatData(data: data)
                 
                 // Auto-prune if exceeds GPU memory limits
-                let maxSplatCount = 2_000_000
+                // Lower limit to 1M for MacBook Air stability (was 2M)
+                let maxSplatCount = 1_000_000
                 if splat.pointCount > maxSplatCount {
                     print("Sharp: ⚠️ Loaded splat exceeds safe limit (\(splat.pointCount) > \(maxSplatCount))")
                     splat = splat.pruned(maxCount: maxSplatCount)

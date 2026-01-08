@@ -15,7 +15,17 @@ class HeadTrackingManager: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
     
     // Throttling State
     private var lastFrameTime: TimeInterval = 0
-    private let minFrameInterval: TimeInterval = 0.05 // Cap at ~20 FPS. 60 FPS is overkill for average head movement.
+    private let minFrameInterval: TimeInterval = 0.1 // Cap at 10 FPS. Sufficient for head parallax, saves massive CPU.
+    
+    // Vision Request Reuse
+    private lazy var faceRequest: VNDetectFaceLandmarksRequest = {
+        VNDetectFaceLandmarksRequest { [weak self] request, error in
+            guard let self = self,
+                  let results = request.results as? [VNFaceObservation],
+                  let face = results.first else { return }
+            self.processFace(face)
+        }
+    }()
     
     // Callback is thread-safe for the consumer
     var onHeadPositionUpdate: (@MainActor (SIMD3<Float>) -> Void)?
@@ -25,6 +35,10 @@ class HeadTrackingManager: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
     func start() {
         guard !isStarted else { return }
         isStarted = true
+        
+        #if DEBUG
+        print("⚠️ HeadTracking: Running in DEBUG mode. Performance may be degraded. Use Release for optimal 60fps splatting.")
+        #endif
         
         sessionQueue.async { [weak self] in
             guard let self = self else { return }
@@ -69,7 +83,7 @@ class HeadTrackingManager: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
     }
     
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-        // Throttling: Ensure we don't process more than 20 FPS
+        // Throttling: Ensure we don't process more than 10 FPS
         let now = Date().timeIntervalSince1970
         guard now - lastFrameTime >= minFrameInterval else { return }
         lastFrameTime = now
@@ -77,14 +91,8 @@ class HeadTrackingManager: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
         
         // Use .up orientation (raw sensor). Mirroring and mapping handled in processFace
         let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .up, options: [:])
-        let faceRequest = VNDetectFaceLandmarksRequest { request, error in
-            guard let results = request.results as? [VNFaceObservation],
-                  let face = results.first else { return }
-            
-            self.processFace(face)
-        }
         
-        try? handler.perform([faceRequest])
+        try? handler.perform([self.faceRequest])
     }
     
     // MARK: - Face Processing

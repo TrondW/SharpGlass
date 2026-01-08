@@ -474,6 +474,7 @@ public class SharpViewModel: ObservableObject {
                 // Auto-prune if exceeds GPU memory limits
                 // Lower limit to 1M for MacBook Air stability (was 2M)
                 let maxSplatCount = 1_000_000
+                print("Sharp DEBUG: Checking pruning - Points: \(splat.pointCount), Limit: \(maxSplatCount)")
                 if splat.pointCount > maxSplatCount {
                     print("Sharp: ⚠️ Loaded splat exceeds safe limit (\(splat.pointCount) > \(maxSplatCount))")
                     splat = splat.pruned(maxCount: maxSplatCount)

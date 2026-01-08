@@ -15,7 +15,7 @@ class HeadTrackingManager: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
     
     // Throttling State
     private var lastFrameTime: TimeInterval = 0
-    private let minFrameInterval: TimeInterval = 0.1 // Cap at 10 FPS. Sufficient for head parallax, saves massive CPU.
+    private let minFrameInterval: TimeInterval = 0.033 // Cap at ~30 FPS. Smoother tracking on CPU.
     
     // Vision Request Reuse
     private lazy var faceRequest: VNDetectFaceLandmarksRequest = {
@@ -44,15 +44,37 @@ class HeadTrackingManager: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
         print("⚠️ HeadTracking: Running in DEBUG mode. Performance may be degraded. Use Release for optimal 60fps splatting.")
         #endif
         
+        // Add Observers for Stability
+        NotificationCenter.default.addObserver(self, selector: #selector(sessionRuntimeError), name: .AVCaptureSessionRuntimeError, object: captureSession)
+        NotificationCenter.default.addObserver(self, selector: #selector(sessionWasInterrupted), name: .AVCaptureSessionWasInterrupted, object: captureSession)
+        NotificationCenter.default.addObserver(self, selector: #selector(sessionInterruptionEnded), name: .AVCaptureSessionInterruptionEnded, object: captureSession)
+        
         sessionQueue.async { [weak self] in
             guard let self = self else { return }
             do {
-                guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front) else {
-                    print("HeadTracking: No front camera found")
+                // Priority: Continuity Camera -> Built-in Wide -> Default
+                var device: AVCaptureDevice?
+                if let continuity = AVCaptureDevice.default(.continuityCamera, for: .video, position: .unspecified) {
+                    device = continuity
+                    print("HeadTracking: 📱 Using Continuity Camera: \(continuity.localizedName)")
+                } else if let builtIn = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front) {
+                    device = builtIn
+                    print("HeadTracking: 💻 Using Built-in Camera: \(builtIn.localizedName)")
+                } else {
+                    device = AVCaptureDevice.default(for: .video)
+                    print("HeadTracking: 📷 Using Default Camera: \(device?.localizedName ?? "Unknown")")
+                }
+                
+                guard let finalDevice = device else {
+                    print("HeadTracking: ❌ No suitable camera found")
                     return
                 }
                 
-                let input = try AVCaptureDeviceInput(device: device)
+                // Clear existing inputs if restarting
+                self.captureSession.inputs.forEach { self.captureSession.removeInput($0) }
+                self.captureSession.outputs.forEach { self.captureSession.removeOutput($0) }
+                
+                let input = try AVCaptureDeviceInput(device: finalDevice)
                 
                 self.captureSession.beginConfiguration()
                 
@@ -75,6 +97,29 @@ class HeadTrackingManager: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
             } catch {
                 print("HeadTracking: Failed to start session: \(error)")
             }
+        }
+    }
+    
+    @objc func sessionRuntimeError(notification: NSNotification) {
+        guard let error = notification.userInfo?[AVCaptureSessionErrorKey] as? AVError else { return }
+        print("HeadTracking: ⚠️ Session Runtime Error: \(error.localizedDescription)")
+        
+        // Auto-restart if media services were reset
+        if error.code == .mediaServicesWereReset {
+            sessionQueue.async { [weak self] in
+                self?.captureSession.startRunning()
+            }
+        }
+    }
+    
+    @objc func sessionWasInterrupted(notification: NSNotification) {
+        print("HeadTracking: ⏸️ Session Interrupted")
+    }
+    
+    @objc func sessionInterruptionEnded(notification: NSNotification) {
+        print("HeadTracking: ▶️ Session Interruption Ended")
+        sessionQueue.async { [weak self] in
+            self?.captureSession.startRunning()
         }
     }
     

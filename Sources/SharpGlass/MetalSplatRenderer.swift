@@ -803,17 +803,18 @@ class MetalSplatRenderer: NSObject, MTKViewDelegate {
         let projMatrix: matrix_float4x4
         if isHolographic {
             // --- Holographic "Window" Projection ---
-            // This treats the physical monitor as a literal window into the 3D scene.
-            // We construct an asymmetric frustum where the near plane aligns with 
-            // the monitor boundary, and the perspective shifts based on head position.
+            // scale = (Visible Frustum Width at Orbit Distance) / (Physical Screen Width)
+            // This ensures the object fills the same % of the screen as in standard mode.
+            let worldScale = calculateWorldScale()
             
             let viewAspect = viewportSize.x / viewportSize.y
-            let sw: Float = 30.0 // Physical screen width in CM (estimated)
+            // Scale physical dimensions into Virtual World Units
+            let sw: Float = 30.0 * worldScale 
             let sh: Float = sw / viewAspect
             
-            let hx = headPosition.x
-            let hy = headPosition.y
-            let hz = headPosition.z
+            let hx = headPosition.x * worldScale
+            let hy = headPosition.y * worldScale
+            let hz = headPosition.z * worldScale
             
             // Proximity damping: ensure we don't clip as the user approaches the screen
             let d = hz 
@@ -950,6 +951,35 @@ class MetalSplatRenderer: NSObject, MTKViewDelegate {
     
     // MARK: - Camera Math
     
+    // Helper to match Holographic Scale to Standard Camera FOV
+    private func calculateWorldScale() -> Float {
+        // Standard Camera FOV is 60 degrees.
+        // We want the Visible Frustum Width at 'orbitDistance' to map to the Physical Screen Width (30cm).
+        
+        let eye = vector_float3(Float(cameraPosition.x), Float(cameraPosition.y), Float(cameraPosition.z))
+        let target: vector_float3
+        if let t = cameraPosition.target {
+            target = vector_float3(Float(t.x), Float(t.y), Float(t.z))
+        } else {
+            target = eye + vector_float3(0, 0, -1)
+        }
+        
+        let dist = distance(eye, target)
+        
+        // Width = 2 * dist * tan(fov/2) * aspect
+        // FOV = 60 deg -> tan(30) = 0.577
+        let fovRad = MathUtils.degreesToRadians(60)
+        let visibleHeight = 2.0 * dist * tan(fovRad / 2.0)
+        let visibleWidth = visibleHeight * aspectRatio
+        
+        // We want visibleWidth (virtual units) to map to 30.0 cm (physical units)
+        // So: virtual = physical * scale
+        // scale = virtual / physical
+        
+        let physicalWidthCM: Float = 30.0
+        return visibleWidth / physicalWidthCM
+    }
+    
     private func makeViewMatrix() -> matrix_float4x4 {
         let eye = vector_float3(Float(cameraPosition.x), Float(cameraPosition.y), Float(cameraPosition.z))
         
@@ -970,10 +1000,7 @@ class MetalSplatRenderer: NSObject, MTKViewDelegate {
             // To achieve 1:1 motion parallax, physical movement (cm) must map
             // to virtual units proportional to the current manual zoom level.
             let distToSplat = distance(eye, target)
-            let distToScreenPhysical = max(10.0, headPosition.z) 
-            
-            // scale = virtual_depth / physical_depth
-            let worldScale = distToSplat / distToScreenPhysical
+            let worldScale = calculateWorldScale()
             
             let hx = headPosition.x * worldScale
             let hy = headPosition.y * worldScale

@@ -22,6 +22,7 @@ struct MetalUniforms {
     var cameraPosition: SIMD4<Float>   // 304 (xyz=pos, w=colorMode)
     var colorParams: SIMD4<Float>      // 320 (x=saturation, y, z, w)
     var affordanceParams: SIMD4<Float> // 336 (xyz = orbitTarget, w = isNavigating)
+    var headPosition: SIMD4<Float>     // 352 (xyz = pos in cm, w = isHolographic)
 }
 
 // MARK: - Renderer
@@ -73,6 +74,8 @@ class MetalSplatRenderer: NSObject, MTKViewDelegate {
     var cameraPosition: CameraPosition = .center
     var orbitTarget: SIMD3<Double> = SIMD3(0, 0, 0)
     var isNavigating: Bool = false
+    var isHolographic: Bool = false
+    var headPosition: SIMD3<Float> = SIMD3<Float>(0, 0, 60)
     var aspectRatio: Float = 1.0
     var viewportSize: SIMD2<Float> = SIMD2<Float>(1024, 1024)
     
@@ -708,7 +711,8 @@ class MetalSplatRenderer: NSObject, MTKViewDelegate {
             styleParams: SIMD4<Float>(0, 0, 0, 0),
             cameraPosition: SIMD4<Float>(0, 0, 0, 0),
             colorParams: SIMD4<Float>(0, 0, 0, 0),
-            affordanceParams: SIMD4<Float>(0, 0, 0, 0)
+            affordanceParams: SIMD4<Float>(0, 0, 0, 0),
+            headPosition: SIMD4<Float>(0, 0, 0, 0)
         )
         encoder.setBytes(&uniforms, length: MemoryLayout<MetalUniforms>.stride, index: 3)
         encoder.dispatchThreadgroups(MTLSize(width: threadgroupCount, height: 1, depth: 1), 
@@ -796,17 +800,48 @@ class MetalSplatRenderer: NSObject, MTKViewDelegate {
         dispatchGPUPointsSort(commandBuffer: commandBuffer, viewMatrix: viewMatrix)
         
         // 2. Render
-        let projMatrix = MathUtils.makePerspectiveMatrix(fovRadians: MathUtils.degreesToRadians(60), aspect: aspectRatio, near: 0.1, far: 1000)
+        let projMatrix: matrix_float4x4
+        if isHolographic {
+            // --- Holographic "Window" Projection ---
+            // This treats the physical monitor as a literal window into the 3D scene.
+            // We construct an asymmetric frustum where the near plane aligns with 
+            // the monitor boundary, and the perspective shifts based on head position.
+            
+            let viewAspect = viewportSize.x / viewportSize.y
+            let sw: Float = 30.0 // Physical screen width in CM (estimated)
+            let sh: Float = sw / viewAspect
+            
+            let hx = headPosition.x
+            let hy = headPosition.y
+            let hz = headPosition.z
+            
+            // Proximity damping: ensure we don't clip as the user approaches the screen
+            let d = hz 
+            let near: Float = 0.1
+            let far: Float = 1000.0
+            
+            // Construct the asymmetric portal bounds
+            let left   = (-sw/2 - hx) * near / d
+            let right  = (sw/2 - hx) * near / d
+            let top    = (sh/2 - hy) * near / d   // Y-down alignment
+            let bottom = (-sh/2 - hy) * near / d
+            
+            projMatrix = MathUtils.makeOffAxisFrustumMatrix(left: left, right: right, bottom: bottom, top: top, near: near, far: far)
+        } else {
+            projMatrix = MathUtils.makePerspectiveMatrix(fovRadians: MathUtils.degreesToRadians(60), aspect: aspectRatio, near: 0.1, far: 1000)
+        }
+
         var uniforms = MetalUniforms(
             viewMatrix: viewMatrix,
             projectionMatrix: projMatrix,
             invViewMatrix: viewMatrix.inverse,
             invProjectionMatrix: projMatrix.inverse,
-            viewportSize: SIMD4<Float>(Float(viewportSize.x), Float(viewportSize.y), Float(shBuffer != nil ? 1.0 : 0.0), Float(splatCount)),
+            viewportSize: SIMD4<Float>(viewportSize.x, viewportSize.y, shBuffer != nil ? 1.0 : 0.0, Float(splatCount)),
             styleParams: SIMD4<Float>(exposure, gamma, vignetteStrength, splatScale),
             cameraPosition: SIMD4<Float>(Float(cameraPosition.x), Float(cameraPosition.y), Float(cameraPosition.z), Float(colorMode)),
             colorParams: SIMD4<Float>(saturation, 0, 0, 0),
-            affordanceParams: SIMD4<Float>(Float(orbitTarget.x), Float(orbitTarget.y), Float(orbitTarget.z), isNavigating ? 1.0 : 0.0)
+            affordanceParams: SIMD4<Float>(Float(orbitTarget.x), Float(orbitTarget.y), Float(orbitTarget.z), isNavigating ? 1.0 : 0.0),
+            headPosition: SIMD4<Float>(headPosition.x, headPosition.y, headPosition.z, isHolographic ? 1.0 : 0.0)
         )
         
         guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: descriptor) else { return }
@@ -916,20 +951,51 @@ class MetalSplatRenderer: NSObject, MTKViewDelegate {
     // MARK: - Camera Math
     
     private func makeViewMatrix() -> matrix_float4x4 {
-        // Standard LookAt Matrix
         let eye = vector_float3(Float(cameraPosition.x), Float(cameraPosition.y), Float(cameraPosition.z))
         
         let target: vector_float3
         if let t = cameraPosition.target {
             target = vector_float3(Float(t.x), Float(t.y), Float(t.z))
         } else {
-            // Fallback for legacy calls (should generally not be hit if VM is correct)
             target = eye + vector_float3(0, 0, -1)
         }
         
-        let up = vector_float3(0, -1, 0) // ml-sharp uses Y-down, so up is -Y
+        let up = vector_float3(0, -1, 0) // ml-sharp uses Y-down
         
-        return MathUtils.matrix_look_at_right_hand(eye: eye, target: target, up: up)
+        // 1. Base Orbit/Fly Matrix
+        let baseView = MathUtils.matrix_look_at_right_hand(eye: eye, target: target, up: up)
+        
+        if isHolographic {
+            // --- Holographic World Scaling ---
+            // To achieve 1:1 motion parallax, physical movement (cm) must map
+            // to virtual units proportional to the current manual zoom level.
+            let distToSplat = distance(eye, target)
+            let distToScreenPhysical = max(10.0, headPosition.z) 
+            
+            // scale = virtual_depth / physical_depth
+            let worldScale = distToSplat / distToScreenPhysical
+            
+            let hx = headPosition.x * worldScale
+            let hy = headPosition.y * worldScale
+            let hz = headPosition.z * worldScale 
+            
+            // We want the 'camera' to be at (hx, hy, hz) relative to the target (0,0,0).
+            // But 'baseView' already places 'target' at (0, 0, -distToSplat).
+            // So we first shift target to (0,0,0): Translate(0, 0, distToSplat)
+            // Then translate to Eye: Translate(-hx, -hy, -hz)
+            // Combined: Translate(-hx, -hy, -hz + distToSplat)
+            
+            let headTranslate = matrix_float4x4(columns: (
+                vector_float4(1, 0, 0, 0),
+                vector_float4(0, 1, 0, 0),
+                vector_float4(0, 0, 1, 0),
+                vector_float4(-hx, -hy, -hz + distToSplat, 1)
+            ))
+            
+            return headTranslate * baseView
+        }
+        
+        return baseView
     }
 }
 

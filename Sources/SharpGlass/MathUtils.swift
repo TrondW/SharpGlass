@@ -40,6 +40,29 @@ struct MathUtils {
         ))
     }
     
+    /// Creates an asymmetric (off-axis) perspective projection matrix.
+    /// This is used for "holographic" or eye-tracking based views.
+    /// - Parameters:
+    ///   - left, right, bottom, top: The coordinates of the frustum's near plane.
+    ///   - near: Near clipping plane.
+    ///   - far: Far clipping plane.
+    /// - Returns: 4x4 Off-Axis Projection Matrix.
+    static func makeOffAxisFrustumMatrix(left: Float, right: Float, bottom: Float, top: Float, near: Float, far: Float) -> matrix_float4x4 {
+        let x = (2.0 * near) / (right - left)
+        let y = (2.0 * near) / (top - bottom)
+        let a = (right + left) / (right - left)
+        let b = (top + bottom) / (top - bottom)
+        let c = far / (near - far)
+        let d = (far * near) / (near - far)
+        
+        return matrix_float4x4(columns: (
+            vector_float4(x, 0, 0, 0),
+            vector_float4(0, y, 0, 0),
+            vector_float4(a, b, c, -1),
+            vector_float4(0, 0, d, 0)
+        ))
+    }
+
     static func degreesToRadians(_ degrees: Float) -> Float {
         return degrees * .pi / 180
     }

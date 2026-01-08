@@ -13,6 +13,19 @@ public class SharpViewModel: ObservableObject {
     // Generation Settings
     @Published var cleanBackground = false  // Disabled - Vision AI not reliable for all images
     @Published var colorMode: ColorMode = .standard
+    @Published var isHolographicModeEnabled: Bool = false {
+        didSet {
+            if isHolographicModeEnabled {
+                headTrackingManager.start()
+            } else {
+                headTrackingManager.stop()
+            }
+        }
+    }
+    @Published var headPosition: SIMD3<Float> = SIMD3<Float>(0, 0, 60) // cm
+    private var targetHeadPosition: SIMD3<Float> = SIMD3<Float>(0, 0, 60)
+    
+    private let headTrackingManager = HeadTrackingManager()
 
     // localized strings
     private enum Constants {
@@ -338,6 +351,18 @@ public class SharpViewModel: ObservableObject {
             flyYaw += (targetFlyYaw - flyYaw) * t
             flyPitch += (targetFlyPitch - flyPitch) * t
         }
+        
+        // --- Smooth Head Position for Holographic ---
+        // XY smoothing (Fast for parallax response)
+        let headK_xy: Float = 10.0
+        let ht_xy = 1.0 - exp(-headK_xy * Float(dt))
+        headPosition.x += (targetHeadPosition.x - headPosition.x) * ht_xy
+        headPosition.y += (targetHeadPosition.y - headPosition.y) * ht_xy
+        
+        // Z smoothing (Slow to dampen phantom zoom)
+        let headK_z: Float = 2.0
+        let ht_z = 1.0 - exp(-headK_z * Float(dt))
+        headPosition.z += (targetHeadPosition.z - headPosition.z) * ht_z
     }
     
     private func updateFlyMovement(dt: Double) {
@@ -375,6 +400,12 @@ public class SharpViewModel: ObservableObject {
     public init(service: SharpServiceProtocol = SharpService()) {
         self.sharpService = service
         checkAvailability()
+        
+        headTrackingManager.onHeadPositionUpdate = { [weak self] pos in
+            // Lock Z to 60cm to prevent phantom zoom artifacts as requested.
+            // XY tracking remains active for parallax.
+            self?.targetHeadPosition = SIMD3<Float>(pos.x, pos.y, 60.0)
+        }
     }
     
     func checkAvailability() {

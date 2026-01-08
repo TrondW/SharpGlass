@@ -167,6 +167,30 @@ public struct MainView: View {
                             }
                         )
                         .padding(.bottom, 30)
+
+                        // Holographic Mode Toggle (Bottom Right)
+                        if viewModel.gaussians != nil {
+                            HStack {
+                                Spacer()
+                                Button(action: { viewModel.isHolographicModeEnabled.toggle() }) {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: viewModel.isHolographicModeEnabled ? "eye.fill" : "eye.slash")
+                                            .font(.system(size: 11, weight: .bold))
+                                        Text("HOLOGRAPHIC")
+                                            .font(.system(size: 9, weight: .black, design: .monospaced))
+                                    }
+                                    .padding(.horizontal, 10)
+                                    .frame(height: 28)
+                                    .background(viewModel.isHolographicModeEnabled ? Color.cyan.opacity(0.8) : Color.white.opacity(0.1))
+                                    .cornerRadius(14)
+                                    .foregroundStyle(viewModel.isHolographicModeEnabled ? .black : .white.opacity(0.6))
+                                }
+                                .buttonStyle(.plain)
+                                .padding(.trailing, 16)
+                                .padding(.bottom, 38)
+                                .shadow(color: .black.opacity(0.3), radius: 10)
+                            }
+                        }
                     }
                 }
                 

@@ -39,6 +39,8 @@ struct MetalSplatView: NSViewRepresentable {
         renderer.gamma = Float(viewModel.gamma)
         renderer.vignetteStrength = Float(viewModel.vignetteStrength)
         renderer.splatScale = Float(viewModel.splatScale)
+        renderer.isHolographic = viewModel.isHolographicModeEnabled
+        renderer.headPosition = viewModel.headPosition
         renderer.saturation = Float(viewModel.saturation)
         renderer.colorMode = viewModel.colorMode == .standard ? 0 : 1
         
